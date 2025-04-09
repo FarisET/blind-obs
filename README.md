@@ -18,3 +18,9 @@ Contributions are welcome! If you want to contribute to this project, feel free 
 
 ### Contact
 For any questions or feedback, feel free to contact [surendramaran8@gmail.com] or open an [issue](https://github.com/surendramaran/YOLOv8-TfLite-Object-Detector/issues/new) in the repository.
+
+###Required Versions
+Android Gradle Plugin Version: 8.3.1
+Gradle Version: 8.4
+Source Compatibility: $JavaVersion.VERSION_17 (JAVA 17)
+Compile SDK Version: 34
