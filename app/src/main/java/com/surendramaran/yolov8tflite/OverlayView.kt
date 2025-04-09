@@ -47,6 +47,9 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         boxPaint.strokeWidth = 8F
         boxPaint.style = Paint.Style.STROKE
     }
+    //concepts:
+    //The multiplication converts normalized coordinates (0-1 range) into actual pixel positions on screen
+    //width and height: dimensions of the view you're drawing on.
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
@@ -58,7 +61,15 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
             val bottom = it.y2 * height
 
             canvas.drawRect(left, top, right, bottom, boxPaint)
-            val drawableText = it.clsName
+
+            // Calculate width and height in pixels
+            val boxWidthPx = (it.w * width).toInt()
+            val boxHeightPx = (it.h * height).toInt()
+
+            val drawableText = "${it.clsName} (${"%.2f".format(it.cnf)}) [${boxWidthPx}x${boxHeightPx}]"
+
+//          old label
+//          val drawableText = it.clsName
 
             textBackgroundPaint.getTextBounds(drawableText, 0, drawableText.length, bounds)
             val textWidth = bounds.width()
