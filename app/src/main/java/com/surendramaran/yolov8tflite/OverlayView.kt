@@ -3,6 +3,7 @@ package com.surendramaran.yolov8tflite
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
@@ -52,10 +53,20 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         "default" to 0.05f
     )
 
+    // Position grid weights (higher = more dangerous area)
+    private val positionWeights = mapOf(
+        "floor" to 1.2f,   // Bottom 20% of screen (trip hazards)
+        "center" to 1.0f,  // Central path
+        "left" to 0.7f,
+        "right" to 0.7f
+    )
+
     private var results = listOf<BoundingBox>()
     private var boxPaint = Paint()
     private var textBackgroundPaint = Paint()
     private var textPaint = Paint()
+
+
 
     private var bounds = Rect()
 
@@ -97,20 +108,124 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         }
     }
 
+//    override fun draw(canvas: Canvas) {
+//        super.draw(canvas)
+//
+//        results.forEach { box ->
+//            // Calculate normalized area
+//            val normalizedArea = box.w * box.h
+//
+//            // Get threshold for this class
+//            val threshold = classThresholds[box.clsName] ?: classThresholds["default"]!!
+//
+//            if (normalizedArea >= threshold) {
+//                drawBoundingBox(canvas, box)
+//            }
+//        }
+//    }
+
+    private val gridPaint = Paint().apply {
+        color = Color.argb(100, 255, 255, 255) // Semi-transparent white
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        pathEffect = DashPathEffect(floatArrayOf(20f, 10f), 0f) // Dashed lines
+    }
+
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
 
-        results.forEach { box ->
-            // Calculate normalized area
-            val normalizedArea = box.w * box.h
+        drawPositionGrid(canvas)
 
-            // Get threshold for this class
-            val threshold = classThresholds[box.clsName] ?: classThresholds["default"]!!
-
-            if (normalizedArea >= threshold) {
-                drawBoundingBox(canvas, box)
-            }
+        val filtered = results.filter {
+            val normalizedArea = it.w * it.h
+            normalizedArea >= (classThresholds[it.clsName] ?: classThresholds["default"]!!)
         }
+
+        val prioritized = filtered.map { box ->
+            Pair(box, calculatePriorityScore(box))
+        }.sortedByDescending { it.second }
+            .take(1) // Take top 2 most critical objects
+
+        prioritized.forEach { (box, _) ->
+            drawBoundingBox(canvas, box)
+            drawPositionIndicator(canvas, box)
+        }
+    }
+
+    private fun drawPositionGrid(canvas: Canvas) {
+        val width = width.toFloat()
+        val height = height.toFloat()
+
+        // Floor zone (bottom 20%)
+        val floorLineY = height * 0.8f
+        canvas.drawLine(0f, floorLineY, width, floorLineY, gridPaint)
+
+        // Center path boundaries (30% and 70% of width)
+        val leftCenterLineX = width * 0.3f
+        val rightCenterLineX = width * 0.7f
+        canvas.drawLine(leftCenterLineX, 0f, leftCenterLineX, floorLineY, gridPaint)
+        canvas.drawLine(rightCenterLineX, 0f, rightCenterLineX, floorLineY, gridPaint)
+
+        // Label each zone
+        val textPaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 40f
+        }
+
+        // Floor label
+        canvas.drawText("FLOOR ZONE", width * 0.4f, height * 0.9f, textPaint)
+
+        // Center label
+        canvas.drawText("CENTER PATH", width * 0.4f, height * 0.4f, textPaint)
+
+        // Side labels
+        canvas.drawText("LEFT", width * 0.1f, height * 0.4f, textPaint)
+        canvas.drawText("RIGHT", width * 0.8f, height * 0.4f, textPaint)
+    }
+
+    private fun calculatePriorityScore(box: BoundingBox): Float {
+        val normalizedArea = box.w * box.h
+        val classWeight = 1 - (classThresholds[box.clsName] ?: 0.05f) // Invert threshold
+        val positionWeight = getPositionWeight(box)
+
+        // Combine factors (adjust weights as needed)
+        return (normalizedArea * 2.5f) + (classWeight * 1.8f) + (positionWeight * 2.0f)
+    }
+
+    private fun getPositionWeight(box: BoundingBox): Float {
+        val (xCenter, yBottom) = (box.cx to box.y2)
+
+        return when {
+            // Floor zone (bottom 20% of screen)
+            yBottom > 0.8f -> positionWeights["floor"]!!
+
+            // Central path (middle 40% horizontally)
+            xCenter in 0.3f..0.7f -> positionWeights["center"]!!
+
+            // Side zones
+            xCenter < 0.3f -> positionWeights["left"]!!
+            else -> positionWeights["right"]!!
+        }
+    }
+
+    private fun drawPositionIndicator(canvas: Canvas, box: BoundingBox) {
+        val position = when {
+            box.y2 > 0.8f -> "FLOOR"
+            box.cx < 0.3f -> "LEFT"
+            box.cx > 0.7f -> "RIGHT"
+            else -> "CENTER"
+        }
+
+        // Draw position text below bounding box
+        val text = "${box.clsName} - $position"
+        val textY = box.y2 * height + 50f // 50px below box
+
+        canvas.drawText(
+            text,
+            box.x1 * width,
+            textY,
+            textPaint
+        )
     }
 
     private fun drawBoundingBox(canvas: Canvas, box: BoundingBox) {
