@@ -12,4 +12,5 @@ data class BoundingBox(
     var cnf: Float,
     val cls: Int,
     val clsName: String
+    
 )
