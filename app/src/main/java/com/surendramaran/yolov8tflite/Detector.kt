@@ -190,9 +190,9 @@ class Detector(
 
         if (boundingBoxes.isEmpty()) return null
 
-        return applyNMS(boundingBoxes)
+        return applySoftNMS(boundingBoxes)
     }
-
+    // remove deuplicates
     private fun applyNMS(boxes: List<BoundingBox>) : MutableList<BoundingBox> {
         val sortedBoxes = boxes.sortedByDescending { it.cnf }.toMutableList()
         val selectedBoxes = mutableListOf<BoundingBox>()
@@ -215,6 +215,38 @@ class Detector(
         return selectedBoxes
     }
 
+    private fun applySoftNMS(boxes: List<BoundingBox>): MutableList<BoundingBox> {
+        val sigma = 0.5F
+        val threshold = CONFIDENCE_THRESHOLD
+        val selectedBoxes = mutableListOf<BoundingBox>()
+        val candidates = boxes.toMutableList()
+
+        while (candidates.isNotEmpty()) {
+            // Pick the highest confidence box
+            candidates.sortByDescending { it.cnf }
+            val current = candidates.removeAt(0)
+            selectedBoxes.add(current)
+
+            val iterator = candidates.iterator()
+            while (iterator.hasNext()) {
+                val box = iterator.next()
+                val iou = calculateIoU(current, box)
+
+                // Reduce the confidence of boxes with high IoU
+                box.cnf *= kotlin.math.exp(-iou * iou / sigma)
+
+                // Remove if confidence goes below threshold
+                if (box.cnf < threshold) {
+                    iterator.remove()
+                }
+            }
+        }
+
+        return selectedBoxes
+    }
+
+
+    // a metric that tells how much two bounding boxes overlap.
     private fun calculateIoU(box1: BoundingBox, box2: BoundingBox): Float {
         val x1 = maxOf(box1.x1, box2.x1)
         val y1 = maxOf(box1.y1, box2.y1)
@@ -237,6 +269,6 @@ class Detector(
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
         private const val CONFIDENCE_THRESHOLD = 0.3F
-        private const val IOU_THRESHOLD = 0.5F
+        private const val IOU_THRESHOLD = 0.3F
     }
 }
