@@ -33,6 +33,13 @@ class Detector(
     private var numChannel = 0
     private var numElements = 0
 
+    val inputWidth: Int
+        get() = tensorWidth
+
+    val inputHeight: Int
+        get() = tensorHeight
+
+
     private val imageProcessor = ImageProcessor.Builder()
         .add(NormalizeOp(INPUT_MEAN, INPUT_STANDARD_DEVIATION))
         .add(CastOp(INPUT_IMAGE_TYPE))
@@ -55,6 +62,7 @@ class Detector(
 
         val inputShape = interpreter.getInputTensor(0)?.shape()
         val outputShape = interpreter.getOutputTensor(0)?.shape()
+
 
         if (inputShape != null) {
             tensorWidth = inputShape[1]

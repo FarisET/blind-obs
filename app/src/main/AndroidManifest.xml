@@ -4,6 +4,7 @@
 
     <uses-feature android:name="android.hardware.camera" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -15,15 +16,23 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.YOLOv8TfLite"
         tools:targetApi="31">
+
+        <!-- Make HomeActivity the launcher activity -->
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Remove launcher intent filter from MainActivity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true" />
+
+        <activity android:name=".VideoSimulationActivity" />
 
         <uses-native-library
             android:name="libOpenCL.so"
@@ -32,5 +41,4 @@
             android:name="libOpenCL-pixel.so"
             android:required="false" />
     </application>
-
 </manifest>
