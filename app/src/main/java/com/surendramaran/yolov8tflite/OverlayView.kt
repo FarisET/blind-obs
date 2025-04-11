@@ -140,7 +140,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
             val normalizedArea = it.w * it.h
             normalizedArea >= (classThresholds[it.clsName] ?: classThresholds["default"]!!)
         }
-
+        //test
         val prioritized = filtered.map { box ->
             Pair(box, calculatePriorityScore(box))
         }.sortedByDescending { it.second }
