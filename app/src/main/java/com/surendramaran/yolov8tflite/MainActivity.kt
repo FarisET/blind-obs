@@ -21,6 +21,9 @@ import com.surendramaran.yolov8tflite.Constants.MODEL_PATH
 import com.surendramaran.yolov8tflite.databinding.ActivityMainBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import android.speech.tts.TextToSpeech
+import java.util.*
+
 
 class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private lateinit var binding: ActivityMainBinding
@@ -33,11 +36,21 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private var detector: Detector? = null
 
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var tts: TextToSpeech
+    private var lastSpokenTime = 0L
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        tts = TextToSpeech(this) { status ->
+            if (status != TextToSpeech.ERROR) {
+                tts.language = Locale.US
+            }
+        }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -159,6 +172,11 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         super.onDestroy()
         detector?.close()
         cameraExecutor.shutdown()
+
+        if (::tts.isInitialized) {
+            tts.stop()
+            tts.shutdown()
+        }
     }
 
     override fun onResume() {
@@ -190,6 +208,20 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
             binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
+            }
+
+            val currentTime = System.currentTimeMillis()
+            if (boundingBoxes.isNotEmpty() && (currentTime - lastSpokenTime > 3000)) {
+                val topObject = boundingBoxes.maxByOrNull { it.cnf } ?: return@runOnUiThread
+                val direction = when {
+                    topObject.y2 > 0.8f -> "on the floor"
+                    topObject.cx < 0.3f -> "on your left"
+                    topObject.cx > 0.7f -> "on your right"
+                    else -> "in front of you"
+                }
+                val message = "${topObject.clsName} $direction."
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null)
+                lastSpokenTime = currentTime
             }
         }
     }
