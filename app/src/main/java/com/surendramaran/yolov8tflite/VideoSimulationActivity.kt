@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -14,6 +16,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.surendramaran.yolov8tflite.Constants.LABELS_PATH
 import com.surendramaran.yolov8tflite.Constants.MODEL_PATH
 import com.surendramaran.yolov8tflite.databinding.ActivityVideoSimulationBinding
+import java.util.LinkedList
+import java.util.Locale
 import kotlin.math.min
 
 class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
@@ -24,6 +28,14 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
     private lateinit var handler: Handler
     private var frameExtractor: Runnable? = null
 
+    // TTS components
+    private lateinit var tts: TextToSpeech
+    private val ttsQueue = LinkedList<String>()
+    private var isTtsSpeaking = false
+    private val COOLDOWN_MS = 3000
+    private val alertHistory = mutableMapOf<String, Long>()
+    private val HISTORY_EXPIRATION_MS = 8000L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityVideoSimulationBinding.inflate(layoutInflater)
@@ -33,7 +45,57 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
         setupDetector()
         setupFilePicker()
         setupControls()
+        initTTS()
     }
+
+    private fun initTTS() {
+        tts = TextToSpeech(this) { status ->
+            if (status != TextToSpeech.ERROR) {
+                tts.language = Locale.US
+                tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        runOnUiThread {
+                            isTtsSpeaking = false
+                            processNextAlert()
+                        }
+                    }
+                    override fun onError(utteranceId: String?) {
+                        runOnUiThread {
+                            isTtsSpeaking = false
+                            processNextAlert()
+                        }
+                    }
+                })
+            }
+        }
+    }
+
+    private fun generateAlertKey(box: BoundingBox): String {
+        val positionKey = when {
+            box.y2 > 0.8f -> "floor"
+            box.cx < 0.3f -> "left"
+            box.cx > 0.7f -> "right"
+            else -> "center"
+        }
+        return "${box.clsName}_$positionKey"
+    }
+
+
+
+    private fun cleanupExpiredHistory() {
+        val currentTime = System.currentTimeMillis()
+        alertHistory.entries.removeAll { currentTime - it.value > HISTORY_EXPIRATION_MS }
+    }
+
+    private fun processNextAlert() {
+        if (!isTtsSpeaking && ttsQueue.isNotEmpty()) {
+            val message = ttsQueue.poll()
+            isTtsSpeaking = true
+            tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, message)
+        }
+    }
+
 
     private fun setupDetector() {
         detector = Detector(
@@ -42,6 +104,7 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
             LABELS_PATH,
             this
         )
+
     }
 
     private fun setupFilePicker() {
@@ -152,18 +215,77 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
+// Update the onDetect function in VideoSimulationActivity
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
-            binding.overlay.setResults(boundingBoxes)
+            cleanupExpiredHistory()
+
+            // Filter objects based on classThresholds and prioritize
+            val filteredBoxes = boundingBoxes.map { box ->
+                // Replace class name with "obstacle" if not in thresholds
+                val displayName = if (DetectionUtils.classThresholds.containsKey(box.clsName)) {
+                    box.clsName
+                } else {
+                    "obstacle"
+                }
+                box.copy(clsName = displayName)
+            }
+
+            val prioritized = DetectionUtils.filterAndPrioritize(filteredBoxes)
+                .take(1)
+                .filter { box ->
+                    val key = generateAlertKey(box)
+                    val shouldAlert = !alertHistory.containsKey(key) ||
+                            (System.currentTimeMillis() - alertHistory[key]!! > HISTORY_EXPIRATION_MS)
+                    if (shouldAlert) alertHistory[key] = System.currentTimeMillis()
+                    shouldAlert
+                }
+
+            binding.overlay.setResults(prioritized)
             binding.overlay.invalidate()
             binding.inferenceTime.text = "${inferenceTime}ms"
+
+            prioritized.map { box ->
+                val position = generateAlertMessage(box)
+                "${box.clsName.replace("_", " ")} $position"
+            }.forEach { message ->
+                if (!ttsQueue.contains(message)) {
+                    ttsQueue.add(message)
+                }
+            }
+
+            processNextAlert()
         }
     }
+
+    // Update the generateAlertMessage function to use proper class names
+    private fun generateAlertMessage(box: BoundingBox): String {
+        val position = when {
+            box.y2 > 0.8f -> "ahead on the floor"
+            box.cx < 0.3f -> "on your left"
+            box.cx > 0.7f -> "on your right"
+            else -> "ahead"
+        }
+
+        // Get the proper display name (either from thresholds or "obstacle")
+        val displayName = if (DetectionUtils.classThresholds.containsKey(box.clsName)) {
+            box.clsName.replace("_", " ")
+        } else {
+            "obstacle"
+        }
+
+        return "$displayName $position"
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
         stopProcessing()
         detector.close()
+        if (::tts.isInitialized) {
+            tts.stop()
+            tts.shutdown()
+        }
     }
 
     companion object {

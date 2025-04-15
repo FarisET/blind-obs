@@ -59,7 +59,6 @@ couch
 potted plant
 bed
 dining table
-toilet
 tv
 laptop
 mouse

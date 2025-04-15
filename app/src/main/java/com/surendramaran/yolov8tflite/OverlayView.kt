@@ -10,56 +10,57 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
+import com.surendramaran.yolov8tflite.DetectionUtils.classThresholds
 import java.util.LinkedList
 import kotlin.math.max
 
 class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs) {
 
     // Class-specific minimum area thresholds (normalized area: w * h)
-    private val classThresholds = mapOf(
-        // High priority obstacles (lower thresholds)
-        "person" to 0.03f,    // 3% of screen area
-        "bicycle" to 0.04f,
-        "car" to 0.05f,
-        "motorcycle" to 0.04f,
-        "bus" to 0.06f,
-        "truck" to 0.07f,
-
-        // Medium priority
-        "traffic light" to 0.02f,
-        "fire hydrant" to 0.015f,
-        "stop sign" to 0.01f,
-        "bench" to 0.04f,
-        "dog" to 0.02f,
-        "cat" to 0.015f,
-
-        // Low priority/rare obstacles (higher thresholds)
-        "chair" to 0.05f,
-        "couch" to 0.08f,
-        "potted plant" to 0.04f,
-        "bed" to 0.1f,
-        "dining table" to 0.1f,
-        "tv" to 0.05f,
-        "laptop" to 0.02f,
-        "mouse" to 0.003f,
-        "remote" to 0.004f,
-        "keyboard" to 0.015f,
-        "cell phone" to 0.005f,
-        "microwave" to 0.03f,
-        "oven" to 0.04f,
-        "toaster" to 0.01f,
-
-        // Default threshold for unlisted classes
-        "default" to 0.05f
-    )
+//    private val classThresholds = mapOf(
+//        // High priority obstacles (lower thresholds)
+//        "person" to 0.03f,    // 3% of screen area
+//        "bicycle" to 0.04f,
+//        "car" to 0.05f,
+//        "motorcycle" to 0.04f,
+//        "bus" to 0.06f,
+//        "truck" to 0.07f,
+//
+//        // Medium priority
+//        "traffic light" to 0.02f,
+//        "fire hydrant" to 0.015f,
+//        "stop sign" to 0.01f,
+//        "bench" to 0.04f,
+//        "dog" to 0.02f,
+//        "cat" to 0.015f,
+//
+//        // Low priority/rare obstacles (higher thresholds)
+//        "chair" to 0.05f,
+//        "couch" to 0.08f,
+//        "potted plant" to 0.04f,
+//        "bed" to 0.1f,
+//        "dining table" to 0.1f,
+//        "tv" to 0.05f,
+//        "laptop" to 0.02f,
+//        "mouse" to 0.003f,
+//        "remote" to 0.004f,
+//        "keyboard" to 0.015f,
+//        "cell phone" to 0.005f,
+//        "microwave" to 0.03f,
+//        "oven" to 0.04f,
+//        "toaster" to 0.01f,
+//
+//        // Default threshold for unlisted classes
+//        "default" to 0.05f
+//    )
 
     // Position grid weights (higher = more dangerous area)
-    private val positionWeights = mapOf(
-        "floor" to 1.2f,   // Bottom 20% of screen (trip hazards)
-        "center" to 1.0f,  // Central path
-        "left" to 0.7f,
-        "right" to 0.7f
-    )
+//    private val positionWeights = mapOf(
+//        "floor" to 1.2f,   // Bottom 20% of screen (trip hazards)
+//        "center" to 1.0f,  // Central path
+//        "left" to 0.7f,
+//        "right" to 0.7f
+//    )
 
     private var results = listOf<BoundingBox>()
     private var boxPaint = Paint()
@@ -136,20 +137,26 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
 
         drawPositionGrid(canvas)
 
-        val filtered = results.filter {
-            val normalizedArea = it.w * it.h
-            normalizedArea >= (classThresholds[it.clsName] ?: classThresholds["default"]!!)
-        }
-        //test
-        val prioritized = filtered.map { box ->
-            Pair(box, calculatePriorityScore(box))
-        }.sortedByDescending { it.second }
-            .take(1) // Take top 2 most critical objects
-
-        prioritized.forEach { (box, _) ->
+        val prioritized = DetectionUtils.filterAndPrioritize(results).take(1)
+        prioritized.forEach { box ->
             drawBoundingBox(canvas, box)
             drawPositionIndicator(canvas, box)
         }
+
+//        val filtered = results.filter {
+//            val normalizedArea = it.w * it.h
+//            normalizedArea >= (DetectionUtils.classThresholds[it.clsName] ?: DetectionUtils.classThresholds["default"]!!)
+//        }
+//        //test
+//        val prioritized = filtered.map { box ->
+//            Pair(box, calculatePriorityScore(box))
+//        }.sortedByDescending { it.second }
+//            .take(1) // Take top 2 most critical objects
+//
+//        prioritized.forEach { (box, _) ->
+//            drawBoundingBox(canvas, box)
+//            drawPositionIndicator(canvas, box)
+//        }
     }
 
     private fun drawPositionGrid(canvas: Canvas) {
@@ -183,30 +190,30 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         canvas.drawText("RIGHT", width * 0.8f, height * 0.4f, textPaint)
     }
 
-    private fun calculatePriorityScore(box: BoundingBox): Float {
-        val normalizedArea = box.w * box.h
-        val classWeight = 1 - (classThresholds[box.clsName] ?: 0.05f) // Invert threshold
-        val positionWeight = getPositionWeight(box)
+//    private fun calculatePriorityScore(box: BoundingBox): Float {
+//        val normalizedArea = box.w * box.h
+//        val classWeight = 1 - (classThresholds[box.clsName] ?: 0.05f) // Invert threshold
+//        val positionWeight = getPositionWeight(box)
+//
+//        // Combine factors (adjust weights as needed)
+//        return (normalizedArea * 2.5f) + (classWeight * 1.8f) + (positionWeight * 2.0f)
+//    }
 
-        // Combine factors (adjust weights as needed)
-        return (normalizedArea * 2.5f) + (classWeight * 1.8f) + (positionWeight * 2.0f)
-    }
-
-    private fun getPositionWeight(box: BoundingBox): Float {
-        val (xCenter, yBottom) = (box.cx to box.y2)
-
-        return when {
-            // Floor zone (bottom 20% of screen)
-            yBottom > 0.8f -> positionWeights["floor"]!!
-
-            // Central path (middle 40% horizontally)
-            xCenter in 0.3f..0.7f -> positionWeights["center"]!!
-
-            // Side zones
-            xCenter < 0.3f -> positionWeights["left"]!!
-            else -> positionWeights["right"]!!
-        }
-    }
+//    private fun getPositionWeight(box: BoundingBox): Float {
+//        val (xCenter, yBottom) = (box.cx to box.y2)
+//
+//        return when {
+//            // Floor zone (bottom 20% of screen)
+//            yBottom > 0.8f -> positionWeights["floor"]!!
+//
+//            // Central path (middle 40% horizontally)
+//            xCenter in 0.3f..0.7f -> positionWeights["center"]!!
+//
+//            // Side zones
+//            xCenter < 0.3f -> positionWeights["left"]!!
+//            else -> positionWeights["right"]!!
+//        }
+//    }
 
     private fun drawPositionIndicator(canvas: Canvas, box: BoundingBox) {
         val position = when {
