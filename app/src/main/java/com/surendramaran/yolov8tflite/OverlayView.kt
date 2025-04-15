@@ -75,14 +75,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         initPaints()
     }
 
-//    fun clear() {
-//        results = listOf()
-//        textPaint.reset()
-//        textBackgroundPaint.reset()
-//        boxPaint.reset()
-//        invalidate()
-//        initPaints()
-//    }
 
     fun clear() {
         results = listOf()
@@ -109,21 +101,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         }
     }
 
-//    override fun draw(canvas: Canvas) {
-//        super.draw(canvas)
-//
-//        results.forEach { box ->
-//            // Calculate normalized area
-//            val normalizedArea = box.w * box.h
-//
-//            // Get threshold for this class
-//            val threshold = classThresholds[box.clsName] ?: classThresholds["default"]!!
-//
-//            if (normalizedArea >= threshold) {
-//                drawBoundingBox(canvas, box)
-//            }
-//        }
-//    }
+
 
     private val gridPaint = Paint().apply {
         color = Color.argb(100, 255, 255, 255) // Semi-transparent white
@@ -143,20 +121,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
             drawPositionIndicator(canvas, box)
         }
 
-//        val filtered = results.filter {
-//            val normalizedArea = it.w * it.h
-//            normalizedArea >= (DetectionUtils.classThresholds[it.clsName] ?: DetectionUtils.classThresholds["default"]!!)
-//        }
-//        //test
-//        val prioritized = filtered.map { box ->
-//            Pair(box, calculatePriorityScore(box))
-//        }.sortedByDescending { it.second }
-//            .take(1) // Take top 2 most critical objects
-//
-//        prioritized.forEach { (box, _) ->
-//            drawBoundingBox(canvas, box)
-//            drawPositionIndicator(canvas, box)
-//        }
+
     }
 
     private fun drawPositionGrid(canvas: Canvas) {
@@ -190,30 +155,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         canvas.drawText("RIGHT", width * 0.8f, height * 0.4f, textPaint)
     }
 
-//    private fun calculatePriorityScore(box: BoundingBox): Float {
-//        val normalizedArea = box.w * box.h
-//        val classWeight = 1 - (classThresholds[box.clsName] ?: 0.05f) // Invert threshold
-//        val positionWeight = getPositionWeight(box)
-//
-//        // Combine factors (adjust weights as needed)
-//        return (normalizedArea * 2.5f) + (classWeight * 1.8f) + (positionWeight * 2.0f)
-//    }
-
-//    private fun getPositionWeight(box: BoundingBox): Float {
-//        val (xCenter, yBottom) = (box.cx to box.y2)
-//
-//        return when {
-//            // Floor zone (bottom 20% of screen)
-//            yBottom > 0.8f -> positionWeights["floor"]!!
-//
-//            // Central path (middle 40% horizontally)
-//            xCenter in 0.3f..0.7f -> positionWeights["center"]!!
-//
-//            // Side zones
-//            xCenter < 0.3f -> positionWeights["left"]!!
-//            else -> positionWeights["right"]!!
-//        }
-//    }
 
     private fun drawPositionIndicator(canvas: Canvas, box: BoundingBox) {
         val position = when {

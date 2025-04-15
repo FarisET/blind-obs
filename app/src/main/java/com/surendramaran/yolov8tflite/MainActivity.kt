@@ -259,12 +259,44 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         alertHistory[key] = System.currentTimeMillis()
     }
 
+//    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+//        runOnUiThread {
+//            binding.inferenceTime.text = "${inferenceTime}ms"
+//            cleanupExpiredHistory()
+//
+//            val prioritized = DetectionUtils.filterAndPrioritize(boundingBoxes)
+//                .take(1)
+//                .filter { shouldAlert(it) }
+//
+//            binding.overlay.apply {
+//                setResults(prioritized)
+//                invalidate()
+//            }
+//
+//            prioritized.forEach { box ->
+//                val message = generateAlertMessage(box)
+//                if (!ttsQueue.contains(message) && !lastMessages.contains(message)) {
+//                    ttsQueue.add(message)
+//                    updateAlertHistory(box)
+//                }
+//            }
+//
+//            processNextAlert()
+//        }
+//    }
+
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
             binding.inferenceTime.text = "${inferenceTime}ms"
             cleanupExpiredHistory()
 
-            val prioritized = DetectionUtils.filterAndPrioritize(boundingBoxes)
+            // Add class name filtering
+            val filteredBoxes = boundingBoxes.map { box ->
+                val displayName = DetectionUtils.getDisplayClassName(box.clsName)
+                box.copy(clsName = displayName)
+            }
+
+            val prioritized = DetectionUtils.filterAndPrioritize(filteredBoxes)
                 .take(1)
                 .filter { shouldAlert(it) }
 
@@ -274,7 +306,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
             }
 
             prioritized.forEach { box ->
-                val message = generateAlertMessage(box)
+                val message = DetectionUtils.generateAlertMessage(box)
                 if (!ttsQueue.contains(message) && !lastMessages.contains(message)) {
                     ttsQueue.add(message)
                     updateAlertHistory(box)

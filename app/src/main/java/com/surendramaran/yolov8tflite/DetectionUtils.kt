@@ -21,19 +21,7 @@ object DetectionUtils {
 
         // Low priority/rare obstacles (higher thresholds)
         "chair" to 0.05f,
-//        "couch" to 0.08f,
         "potted plant" to 0.04f,
-        //"bed" to 0.1f,
-        //"dining table" to 0.1f,
-        //"tv" to 0.05f,
-        //"laptop" to 0.02f,
-//        "mouse" to 0.003f,
-//        "remote" to 0.004f,
-        //"keyboard" to 0.015f,
-//        "cell phone" to 0.005f,
-        //"microwave" to 0.03f,
-        //"oven" to 0.04f,
-        //"toaster" to 0.01f,
 
         // Default threshold for unlisted classes
         "default" to 0.05f
@@ -62,6 +50,25 @@ object DetectionUtils {
             xCenter in 0.3f..0.7f -> positionWeights["center"]!!
             xCenter < 0.3f -> positionWeights["left"]!!
             else -> positionWeights["right"]!!
+        }
+    }
+
+    fun getDisplayClassName(originalName: String): String {
+        return if (classThresholds.containsKey(originalName)) originalName else "obstacle"
+    }
+
+    fun generateAlertMessage(box: BoundingBox): String {
+        val displayName = getDisplayClassName(box.clsName).replace("_", " ")
+        val position = getPositionDescription(box)
+        return "$displayName $position"
+    }
+
+    fun getPositionDescription(box: BoundingBox): String {
+        return when {
+            box.y2 > 0.8f -> "ahead on the floor"
+            box.cx < 0.3f -> "on your left"
+            box.cx > 0.7f -> "on your right"
+            else -> "ahead"
         }
     }
 
