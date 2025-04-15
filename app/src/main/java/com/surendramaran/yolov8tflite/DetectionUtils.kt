@@ -83,4 +83,32 @@ object DetectionUtils {
         }.sortedByDescending { it.second }
             .map { it.first }
     }
+
+    // Common alert history management
+    fun shouldAlert(alertHistory: MutableMap<String, Long>, box: BoundingBox): Boolean {
+        val key = generateHistoryKey(box)
+        val currentTime = System.currentTimeMillis()
+        return when {
+            !alertHistory.containsKey(key) -> true
+            currentTime - alertHistory[key]!! > HISTORY_EXPIRATION_MS -> true
+            else -> false
+        }
+    }
+
+    fun generateHistoryKey(box: BoundingBox): String {
+        val positionKey = when {
+            box.y2 > 0.8f -> "floor"
+            box.cx < 0.3f -> "left"
+            box.cx > 0.7f -> "right"
+            else -> "center"
+        }
+        return "${box.clsName}_$positionKey"
+    }
+
+    fun cleanupExpiredHistory(alertHistory: MutableMap<String, Long>) {
+        val currentTime = System.currentTimeMillis()
+        alertHistory.entries.removeAll { currentTime - it.value > HISTORY_EXPIRATION_MS }
+    }
+
+    const val HISTORY_EXPIRATION_MS = 8000L
 }

@@ -215,30 +215,22 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
-// Update the onDetect function in VideoSimulationActivity
+    // Update the onDetect function
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
             cleanupExpiredHistory()
 
-            // Filter objects based on classThresholds and prioritize
-            val filteredBoxes = boundingBoxes.map { box ->
-                // Replace class name with "obstacle" if not in thresholds
-                val displayName = if (DetectionUtils.classThresholds.containsKey(box.clsName)) {
-                    box.clsName
-                } else {
-                    "obstacle"
-                }
-                box.copy(clsName = displayName)
+            // Centralized class name handling
+            val processedBoxes = boundingBoxes.map { box ->
+                box.copy(clsName = DetectionUtils.getDisplayClassName(box.clsName))
             }
 
-            val prioritized = DetectionUtils.filterAndPrioritize(filteredBoxes)
+            val prioritized = DetectionUtils.filterAndPrioritize(processedBoxes)
                 .take(1)
                 .filter { box ->
-                    val key = generateAlertKey(box)
-                    val shouldAlert = !alertHistory.containsKey(key) ||
-                            (System.currentTimeMillis() - alertHistory[key]!! > HISTORY_EXPIRATION_MS)
-                    if (shouldAlert) alertHistory[key] = System.currentTimeMillis()
-                    shouldAlert
+                    DetectionUtils.shouldAlert(alertHistory, box).also {
+                        if (it) alertHistory[DetectionUtils.generateHistoryKey(box)] = System.currentTimeMillis()
+                    }
                 }
 
             binding.overlay.setResults(prioritized)
@@ -246,8 +238,7 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
             binding.inferenceTime.text = "${inferenceTime}ms"
 
             prioritized.map { box ->
-                val position = generateAlertMessage(box)
-                "${box.clsName.replace("_", " ")} $position"
+                DetectionUtils.generateAlertMessage(box)
             }.forEach { message ->
                 if (!ttsQueue.contains(message)) {
                     ttsQueue.add(message)
@@ -258,24 +249,13 @@ class VideoSimulationActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
-    // Update the generateAlertMessage function to use proper class names
+    // Simplify the generateAlertMessage function
     private fun generateAlertMessage(box: BoundingBox): String {
-        val position = when {
-            box.y2 > 0.8f -> "ahead on the floor"
-            box.cx < 0.3f -> "on your left"
-            box.cx > 0.7f -> "on your right"
-            else -> "ahead"
-        }
-
-        // Get the proper display name (either from thresholds or "obstacle")
-        val displayName = if (DetectionUtils.classThresholds.containsKey(box.clsName)) {
-            box.clsName.replace("_", " ")
-        } else {
-            "obstacle"
-        }
-
-        return "$displayName $position"
+        val position = DetectionUtils.getPositionDescription(box)
+        return "${box.clsName.replace("_", " ")} $position"
     }
+
+// Remove the generateAlertKey function and use DetectionUtils version
 
 
     override fun onDestroy() {
